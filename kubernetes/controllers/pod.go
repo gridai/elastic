@@ -11,13 +11,14 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/kubeflow/common/pkg/controller.v1/common"
 	logger "github.com/kubeflow/common/pkg/util"
 	"github.com/pytorch/elastic/kubernetes/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
 )
 
 // CreatePod creates the pod of the job
@@ -87,6 +88,25 @@ func convertPodList(list []corev1.Pod) []*corev1.Pod {
 	return ret
 }
 
+func InsertTorchArgs(container *corev1.Container, torchArgs []string) {
+	insertIndex := -1
+
+	// Traverse the args from the back to find the distributed arg.
+	// If none found, then we assume it's in the command and insert from arg 0.
+	for i := len(container.Args) - 1; i >= 0; i-- {
+		if container.Args[i] == "torchelastic.distributed.launch" {
+			insertIndex = i
+			break
+		}
+	}
+
+	// Write into the position after the arg index
+	insertIndex += 1
+
+	// Insert the torch distributed args
+	container.Args = append(container.Args[:insertIndex], append(torchArgs, container.Args[insertIndex:]...)...)
+}
+
 // Set pod environment set for ElasticJob
 func SetClusterSpecForPod(job interface{}, podTemplate *corev1.PodTemplateSpec) error {
 	elasticJob, ok := job.(*v1alpha1.ElasticJob)
@@ -119,9 +139,11 @@ func SetClusterSpecForPod(job interface{}, podTemplate *corev1.PodTemplateSpec) 
 		"--rdzv_id=" + elasticJob.Name,
 		"--nnodes=" + strconv.Itoa(int(minReplicas)) + ":" + strconv.Itoa(int(maxReplicas))}
 
-	for i := range podTemplate.Spec.Containers {
-		podTemplate.Spec.Containers[i].Args = append(launchDefaultArgs, podTemplate.Spec.Containers[i].Args...)
-	}
+	// Only modify the first container as we assume that's the actually pytorch container
+	// The rest will be side cars that we shouldn't inject.
+	container := &podTemplate.Spec.Containers[0]
+
+	InsertTorchArgs(container, launchDefaultArgs)
 
 	return nil
 }
