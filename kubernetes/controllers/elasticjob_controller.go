@@ -10,6 +10,7 @@ package controllers
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
 	commonv1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	"github.com/kubeflow/common/pkg/controller.v1/common"
@@ -205,5 +206,5 @@ func (r *ElasticJobReconciler) IsMasterRole(replicas map[commonv1.ReplicaType]*c
 
 // SetClusterSpec sets the cluster spec for the pod
 func (r *ElasticJobReconciler) SetClusterSpec(job interface{}, podTemplate *corev1.PodTemplateSpec, rtype, index string) error {
-	return SetClusterSpecForPod(job, podTemplate)
+	return SetClusterSpecForPod(job, podTemplate, index)
 }

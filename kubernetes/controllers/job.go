@@ -11,6 +11,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
+
 	v1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	commonutil "github.com/kubeflow/common/pkg/util"
 	logger "github.com/kubeflow/common/pkg/util"
@@ -19,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 )
 
 // Reasons for job events.

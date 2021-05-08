@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/kubeflow/common/pkg/controller.v1/common"
 	logger "github.com/kubeflow/common/pkg/util"
@@ -88,6 +89,28 @@ func convertPodList(list []corev1.Pod) []*corev1.Pod {
 	return ret
 }
 
+func ModifyVolumeMount(podTemplate *corev1.PodTemplateSpec, index string) {
+	if len(podTemplate.Spec.Volumes) == 0 {
+		return
+	}
+
+	for _, v := range podTemplate.Spec.Volumes {
+		if v.VolumeSource.PersistentVolumeClaim != nil {
+			// Modify the claim name to be based on the index.
+			// The controller currently set it to be name-0, and we
+			// want to fix this to be name-{index}
+			claimName := v.VolumeSource.PersistentVolumeClaim.ClaimName
+			if !strings.Contains(claimName, "-") {
+				continue
+			}
+
+			lastIndex := strings.LastIndex(claimName, "-")
+			claimName = claimName[:lastIndex] + "-" + index
+			v.VolumeSource.PersistentVolumeClaim.ClaimName = claimName
+		}
+	}
+}
+
 func InsertTorchArgs(container *corev1.Container, torchArgs []string) {
 	insertIndex := -1
 
@@ -108,7 +131,7 @@ func InsertTorchArgs(container *corev1.Container, torchArgs []string) {
 }
 
 // Set pod environment set for ElasticJob
-func SetClusterSpecForPod(job interface{}, podTemplate *corev1.PodTemplateSpec) error {
+func SetClusterSpecForPod(job interface{}, podTemplate *corev1.PodTemplateSpec, index string) error {
 	elasticJob, ok := job.(*v1alpha1.ElasticJob)
 	if !ok {
 		return fmt.Errorf("%+v is not a type of ElasticJob", elasticJob)
@@ -144,6 +167,7 @@ func SetClusterSpecForPod(job interface{}, podTemplate *corev1.PodTemplateSpec) 
 	container := &podTemplate.Spec.Containers[0]
 
 	InsertTorchArgs(container, launchDefaultArgs)
+	ModifyVolumeMount(podTemplate, index)
 
 	return nil
 }
